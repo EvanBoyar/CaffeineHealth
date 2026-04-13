@@ -1,0 +1,10 @@
+First release of Caffeine Health!
+
+• Real-time 24-hour caffeine curve
+• Personalized pharmacokinetic modeling
+• Sleep forecast at your configured bedtime
+• Curated drink catalog with one-tap logging
+• Drink detail sheets with contribution curves
+• Material 3 Expressive design with dynamic color
+• Full dark mode support
+• Haptic feedback throughout

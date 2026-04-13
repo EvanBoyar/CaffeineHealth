@@ -1,0 +1,25 @@
+Caffeine Health is a beautifully designed Android app that helps you understand how your caffeine intake affects your body throughout the day — and whether that late-afternoon espresso might cost you sleep tonight.
+
+Log drinks from a curated catalog, watch your active caffeine level in real time on a 24-hour curve, and get a personalized sleep forecast based on your unique metabolism.
+
+<b>Features:</b>
+
+• Real-time 24-hour caffeine curve with emoji drink markers
+• Personalized pharmacokinetic modeling based on age, weight, lifestyle
+• Sleep forecast — see if caffeine will affect your bedtime
+• Curated drink catalog: coffee, tea, energy drinks, soda
+• Drink detail sheets showing individual contribution curves
+• Quick actions — edit, duplicate, or delete entries
+• Material 3 Expressive design with dynamic color
+• Montserrat typography and haptic feedback throughout
+• Full dark mode support
+
+<b>Privacy:</b>
+
+• Fully offline — all data stays on your device
+• No ads, no tracking, no analytics, no accounts
+• Open source (GPL-3.0)
+
+<b>Science:</b>
+
+The app uses a one-compartment oral pharmacokinetic model with personalized half-life calculation. Your caffeine metabolism is estimated from age, weight, smoking status, alcohol intake, and CYP1A2-inhibiting medications — grounded in real pharmacology.
