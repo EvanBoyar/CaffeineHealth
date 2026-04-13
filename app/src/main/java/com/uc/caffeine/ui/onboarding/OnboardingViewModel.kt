@@ -3,6 +3,7 @@ package com.uc.caffeine.ui.onboarding
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.uc.caffeine.data.ProfileFactors
 import com.uc.caffeine.data.SettingsRepository
 import java.time.LocalTime
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +52,10 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
     fun decrementWeight() {
         updateAnswers { answers -> answers.adjustedWeight(delta = -1) }
+    }
+
+    fun setWeight(value: Int) {
+        updateAnswers { answers -> answers.copy(weightValue = answers.weightUnit.clamp(value)) }
     }
 
     fun updateWeightUnit(weightUnit: WeightUnit) {
@@ -121,10 +126,14 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         val profile = state.currentProfile() ?: return
         if (!state.legalAcknowledged || state.isSaving) return
 
+        val factors = if (!state.useDefaultProfile) {
+            state.answers.toProfileFactors()
+        } else null
+
         viewModelScope.launch {
             _uiState.update { currentState -> currentState.copy(isSaving = true) }
             runCatching {
-                settingsRepository.completeOnboarding(profile)
+                settingsRepository.completeOnboarding(profile, factors)
             }.onSuccess {
                 _uiState.update { currentState ->
                     currentState.copy(
@@ -154,3 +163,15 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 }
+
+private fun OnboardingAnswers.toProfileFactors(): ProfileFactors = ProfileFactors(
+    ageBucket = ageBucket?.name,
+    weightValue = weightValue,
+    weightUnit = weightUnit.name,
+    hasInsomnia = hasInsomnia,
+    smokingHabit = smokingHabit?.name,
+    heavyAlcohol = heavyAlcohol,
+    heavyCaffeine = heavyCaffeine,
+    liverDisease = liverDisease?.name,
+    medications = medications.map { it.name }.toSet(),
+)

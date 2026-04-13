@@ -97,6 +97,7 @@ internal fun BasicInfoScreen(
     onWeightIncrement: () -> Unit,
     onWeightDecrement: () -> Unit,
     onWeightUnitSelected: (WeightUnit) -> Unit,
+    onWeightChanged: (Int) -> Unit = {},
 ) {
     OnboardingScaffold(
         title = "Set your baseline",
@@ -136,6 +137,7 @@ internal fun BasicInfoScreen(
                 onWeightUnitSelected = onWeightUnitSelected,
                 onIncrement = onWeightIncrement,
                 onDecrement = onWeightDecrement,
+                onWeightChanged = onWeightChanged,
             )
         }
     }

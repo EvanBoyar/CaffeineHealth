@@ -265,7 +265,7 @@ private fun buildDailyBedtimeStat(
     val caffeineMg = CaffeineCalculator.calculateCurrentLevel(
         entries = entries,
         currentTimeMillis = bedtimeMillis,
-        halfLifeMinutes = settings.halfLifeMinutes,
+        halfLifeMinutes = settings.effectiveHalfLifeMinutes,
     )
 
     return DailyBedtimeStat(

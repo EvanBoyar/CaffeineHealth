@@ -49,7 +49,7 @@ object ChartDataGenerator {
             entries = entries,
             targetLevelMg = BASELINE_TARGET_MG,
             currentTimeMillis = currentTime,
-            halfLifeMinutes = settings.halfLifeMinutes,
+            halfLifeMinutes = settings.effectiveHalfLifeMinutes,
         )?.coerceAtMost(currentTime + MAX_FUTURE_BASELINE_WINDOW_MILLIS)
         val baselineTailEndTime = baselineReturnTime?.plus(BASE_INTERVAL_MILLIS) ?: currentTime
         val endTime = roundUpToInterval(
@@ -79,7 +79,7 @@ object ChartDataGenerator {
             entries = entries,
             startTime = domainStartTime,
             endTime = endTime,
-            halfLifeMinutes = settings.halfLifeMinutes,
+            halfLifeMinutes = settings.effectiveHalfLifeMinutes,
         )
 
         return ChartData(
@@ -105,7 +105,7 @@ object ChartDataGenerator {
         val intervalMillis = BASE_INTERVAL_MILLIS
         val peakTime = CaffeineCalculator.calculatePeakTime(
             entry = entry,
-            halfLifeMinutes = settings.halfLifeMinutes,
+            halfLifeMinutes = settings.effectiveHalfLifeMinutes,
         )
         val startTime = roundDownToInterval(entry.startedAtMillis, intervalMillis)
         val maxWindowEnd = startTime + (MAX_DETAIL_WINDOW_HOURS * 60 * 60 * 1000L)
@@ -124,7 +124,7 @@ object ChartDataGenerator {
                         caffeineContributionMg = CaffeineCalculator.calculateEntryContribution(
                             entry = entry,
                             currentTimeMillis = pointTime,
-                            halfLifeMinutes = settings.halfLifeMinutes,
+                            halfLifeMinutes = settings.effectiveHalfLifeMinutes,
                         )
                     )
                 )
@@ -135,12 +135,12 @@ object ChartDataGenerator {
         val peakContribution = CaffeineCalculator.calculateEntryContribution(
             entry = entry,
             currentTimeMillis = peakTime,
-            halfLifeMinutes = settings.halfLifeMinutes,
+            halfLifeMinutes = settings.effectiveHalfLifeMinutes,
         )
         val currentContribution = CaffeineCalculator.calculateEntryContribution(
             entry = entry,
             currentTimeMillis = currentTime,
-            halfLifeMinutes = settings.halfLifeMinutes,
+            halfLifeMinutes = settings.effectiveHalfLifeMinutes,
         )
         val peakMarkerIndex = dataPoints.indices.minByOrNull { index ->
             abs(dataPoints[index].timestampMillis - peakTime)
@@ -214,7 +214,7 @@ object ChartDataGenerator {
             val actualCaffeineLevel = CaffeineCalculator.calculateCurrentLevel(
                 entries = entries,
                 currentTimeMillis = pointTime,
-                halfLifeMinutes = settings.halfLifeMinutes,
+                halfLifeMinutes = settings.effectiveHalfLifeMinutes,
             )
             val displayCaffeineLevel = when {
                 entries.isEmpty() -> actualCaffeineLevel

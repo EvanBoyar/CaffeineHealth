@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -18,7 +19,7 @@ import java.util.Locale
 // Extension property to create DataStore
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_settings")
 
-internal object SettingsKeys {
+object SettingsKeys {
     val HALF_LIFE_MINUTES = intPreferencesKey("half_life_minutes")
     val SLEEP_THRESHOLD_MG = intPreferencesKey("sleep_threshold_mg")
     val ABSORPTION_RATE_MINUTES = intPreferencesKey("absorption_rate_minutes")
@@ -30,6 +31,20 @@ internal object SettingsKeys {
     val DATE_FORMAT = stringPreferencesKey("date_format")
     val TIME_ZONE_ID = stringPreferencesKey("time_zone_id")
     val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
+    val CYP1A2_GENOTYPE = stringPreferencesKey("cyp1a2_genotype")
+    val AHR_GENOTYPE = stringPreferencesKey("ahr_genotype")
+    val HORMONAL_STATUS = stringPreferencesKey("hormonal_status")
+
+    // Raw onboarding profile factors
+    val PROFILE_AGE_BUCKET = stringPreferencesKey("profile_age_bucket")
+    val PROFILE_WEIGHT_VALUE = intPreferencesKey("profile_weight_value")
+    val PROFILE_WEIGHT_UNIT = stringPreferencesKey("profile_weight_unit")
+    val PROFILE_HAS_INSOMNIA = stringPreferencesKey("profile_has_insomnia")
+    val PROFILE_SMOKING_HABIT = stringPreferencesKey("profile_smoking_habit")
+    val PROFILE_HEAVY_ALCOHOL = stringPreferencesKey("profile_heavy_alcohol")
+    val PROFILE_HEAVY_CAFFEINE = stringPreferencesKey("profile_heavy_caffeine")
+    val PROFILE_LIVER_DISEASE = stringPreferencesKey("profile_liver_disease")
+    val PROFILE_MEDICATIONS = stringSetPreferencesKey("profile_medications")
 }
 
 /**
@@ -128,9 +143,37 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
-    suspend fun completeOnboarding(profile: DerivedOnboardingProfile) {
+    suspend fun updateCyp1a2Genotype(genotype: Cyp1a2Genotype) {
+        context.dataStore.edit { prefs ->
+            prefs[SettingsKeys.CYP1A2_GENOTYPE] = genotype.name
+        }
+    }
+
+    suspend fun updateAhrGenotype(genotype: AhrGenotype) {
+        context.dataStore.edit { prefs ->
+            prefs[SettingsKeys.AHR_GENOTYPE] = genotype.name
+        }
+    }
+
+    suspend fun updateHormonalStatus(status: HormonalStatus) {
+        context.dataStore.edit { prefs ->
+            prefs[SettingsKeys.HORMONAL_STATUS] = status.name
+        }
+    }
+
+    suspend fun updateProfileFactor(block: MutablePreferences.() -> Unit) {
+        context.dataStore.edit { prefs ->
+            prefs.block()
+        }
+    }
+
+    suspend fun completeOnboarding(
+        profile: DerivedOnboardingProfile,
+        factors: ProfileFactors? = null,
+    ) {
         context.dataStore.edit { prefs ->
             prefs.writeOnboardingCompletion(profile)
+            factors?.let { prefs.writeProfileFactors(it) }
         }
     }
 
@@ -156,7 +199,44 @@ internal fun Preferences.toUserSettings(defaultSettings: UserSettings): UserSett
         dateFormat = AppDateFormat.fromStorage(this[SettingsKeys.DATE_FORMAT]),
         timeZoneId = this[SettingsKeys.TIME_ZONE_ID] ?: defaultSettings.timeZoneId,
         isOnboardingComplete = this[SettingsKeys.ONBOARDING_COMPLETE] ?: hasLegacyProfilePrefs,
+        profileFactors = this.toProfileFactors(),
+        cyp1a2Genotype = Cyp1a2Genotype.fromStorage(this[SettingsKeys.CYP1A2_GENOTYPE]),
+        ahrGenotype = AhrGenotype.fromStorage(this[SettingsKeys.AHR_GENOTYPE]),
+        hormonalStatus = HormonalStatus.fromStorage(this[SettingsKeys.HORMONAL_STATUS]),
     )
+}
+
+fun Preferences.toProfileFactors(): ProfileFactors {
+    return ProfileFactors(
+        ageBucket = this[SettingsKeys.PROFILE_AGE_BUCKET],
+        weightValue = this[SettingsKeys.PROFILE_WEIGHT_VALUE] ?: 60,
+        weightUnit = this[SettingsKeys.PROFILE_WEIGHT_UNIT] ?: "Kilograms",
+        hasInsomnia = this[SettingsKeys.PROFILE_HAS_INSOMNIA]?.toBooleanStrictOrNull(),
+        smokingHabit = this[SettingsKeys.PROFILE_SMOKING_HABIT],
+        heavyAlcohol = this[SettingsKeys.PROFILE_HEAVY_ALCOHOL]?.toBooleanStrictOrNull(),
+        heavyCaffeine = this[SettingsKeys.PROFILE_HEAVY_CAFFEINE]?.toBooleanStrictOrNull(),
+        liverDisease = this[SettingsKeys.PROFILE_LIVER_DISEASE],
+        medications = this[SettingsKeys.PROFILE_MEDICATIONS] ?: emptySet(),
+    )
+}
+
+internal fun MutablePreferences.writeProfileFactors(factors: ProfileFactors) {
+    factors.ageBucket?.let { this[SettingsKeys.PROFILE_AGE_BUCKET] = it }
+    this[SettingsKeys.PROFILE_WEIGHT_VALUE] = factors.weightValue
+    this[SettingsKeys.PROFILE_WEIGHT_UNIT] = factors.weightUnit
+    factors.hasInsomnia?.let { this[SettingsKeys.PROFILE_HAS_INSOMNIA] = it.toString() }
+    factors.smokingHabit?.let { this[SettingsKeys.PROFILE_SMOKING_HABIT] = it }
+    factors.heavyAlcohol?.let { this[SettingsKeys.PROFILE_HEAVY_ALCOHOL] = it.toString() }
+    factors.heavyCaffeine?.let { this[SettingsKeys.PROFILE_HEAVY_CAFFEINE] = it.toString() }
+    factors.liverDisease?.let { this[SettingsKeys.PROFILE_LIVER_DISEASE] = it }
+    if (factors.medications.isNotEmpty()) {
+        this[SettingsKeys.PROFILE_MEDICATIONS] = factors.medications
+    }
+
+    // When OC is in the medication set, also set hormonal status
+    if (factors.medications.contains("OralContraceptives")) {
+        this[SettingsKeys.HORMONAL_STATUS] = HormonalStatus.ORAL_CONTRACEPTIVES.name
+    }
 }
 
 internal fun MutablePreferences.writeOnboardingCompletion(profile: DerivedOnboardingProfile) {

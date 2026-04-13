@@ -74,7 +74,7 @@ enum class Medication(
 ) {
     None("None", 0),
     Cimetidine("Cimetidine", 45),
-    OralContraceptives("Oral contraceptives", 60),
+    OralContraceptives("Hormonal contraceptives", 0),
     Ciprofloxacin("Ciprofloxacin", 120),
     Fluvoxamine("Fluvoxamine", 180),
     OtherCyp1A2Inhibitor("Other CYP1A2 inhibitor", 60),
@@ -190,7 +190,7 @@ internal fun LiverDisease.buttonLabel(): String {
 
 internal fun Medication.buttonLabel(): String {
     return when (this) {
-        Medication.OralContraceptives -> "Oral contraceptives"
+        Medication.OralContraceptives -> "Hormonal contraceptives"
         Medication.OtherCyp1A2Inhibitor -> "Other CYP1A2 inhibitor"
         else -> label
     }
