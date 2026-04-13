@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Only back up DataStore preferences (half-life, bedtime, threshold).
+         Omitting the database domain implicitly excludes Room — safer than
+         explicit excludes which trigger lint errors on this format. -->
+    <include domain="sharedpref" path="." />
+</full-backup-content>

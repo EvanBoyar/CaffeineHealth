@@ -1,0 +1,35 @@
+*.iml
+.gradle
+/local.properties
+local.properties
+
+# IDE
+.idea/
+.vscode/
+.github/
+
+# Kotlin compiler errors
+.kotlin/
+
+# Build outputs
+/build
+app/build/
+/captures
+.externalNativeBuild
+.cxx
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temp / dev artifacts
+tmp_vico/
+artifacts/
+
+# Backup files
+*- Backup*
+*- Copy*
+
+# Built APKs (attached to GitHub Releases instead)
+app/release/

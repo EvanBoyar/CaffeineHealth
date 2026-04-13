@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Caffeine Health</string>
+    <string name="onboarding_smoking_source_url">https://pubmed.ncbi.nlm.nih.gov/2623013/</string>
+    <string name="onboarding_alcohol_source_url">https://www.cdc.gov/alcohol/about-alcohol-use/alcohol-caffeine.html</string>
+    <string name="onboarding_caffeine_source_url">https://pmc.ncbi.nlm.nih.gov/articles/PMC11703537/</string>
+    <string name="onboarding_medication_source_url">https://www.ncbi.nlm.nih.gov/books/NBK223808/</string>
+</resources>
