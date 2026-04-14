@@ -102,6 +102,7 @@ fun OnboardingRoot(
                             onWeightIncrement = viewModel::incrementWeight,
                             onWeightDecrement = viewModel::decrementWeight,
                             onWeightUnitSelected = viewModel::updateWeightUnit,
+                            onWeightChanged = viewModel::setWeight,
                         )
 
                         OnboardingDestination.Sleep -> SleepScreen(

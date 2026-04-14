@@ -1,10 +1,62 @@
 package com.uc.caffeine.data
 
 import java.time.ZoneId
+import kotlin.math.roundToInt
+
+/**
+ * CYP1A2 rs762551 genotype — affects caffeine metabolism speed.
+ * A/A is the "fast metabolizer" reference genotype.
+ */
+enum class Cyp1a2Genotype(val label: String, val clearanceFactor: Double) {
+    NOT_SET("Not set", 1.0),
+    AA("A/A — fast metabolizer", 1.0),
+    AC("A/C — intermediate", 0.78),
+    CC("C/C — slow metabolizer", 0.63),
+    ;
+
+    companion object {
+        fun fromStorage(value: String?): Cyp1a2Genotype =
+            entries.find { it.name == value } ?: NOT_SET
+    }
+}
+
+/**
+ * AHR rs2066853 genotype — affects CYP1A2 expression level.
+ * G/G is the normal-expression reference genotype.
+ */
+enum class AhrGenotype(val label: String, val clearanceFactor: Double) {
+    NOT_SET("Not set", 1.0),
+    GG("G/G — normal", 1.0),
+    A_CARRIER("G/A or A/A — reduced", 0.78),
+    ;
+
+    companion object {
+        fun fromStorage(value: String?): AhrGenotype =
+            entries.find { it.name == value } ?: NOT_SET
+    }
+}
+
+/**
+ * Hormonal status that modulates caffeine clearance.
+ * Pregnancy progressively suppresses CYP1A2; oral contraceptives inhibit it.
+ */
+enum class HormonalStatus(val label: String, val clearanceFactor: Double) {
+    NONE("None", 1.0),
+    ORAL_CONTRACEPTIVES("Hormonal contraceptives", 0.48),
+    PREGNANT_FIRST("Pregnant — 1st trimester", 0.73),
+    PREGNANT_SECOND("Pregnant — 2nd trimester", 0.48),
+    PREGNANT_THIRD("Pregnant — 3rd trimester", 0.28),
+    ;
+
+    companion object {
+        fun fromStorage(value: String?): HormonalStatus =
+            entries.find { it.name == value } ?: NONE
+    }
+}
 
 /**
  * User preferences for personalized caffeine tracking.
- * 
+ *
  * These settings affect half-life calculations and sleep recommendations.
  */
 data class UserSettings(
@@ -74,4 +126,40 @@ data class UserSettings(
      * Whether the first-run onboarding flow has been completed or intentionally skipped.
      */
     val isOnboardingComplete: Boolean = false,
-)
+
+    /**
+     * Raw onboarding profile factors, stored for later editing from Settings.
+     */
+    val profileFactors: ProfileFactors = ProfileFactors(),
+
+    /**
+     * Optional CYP1A2 rs762551 genotype for more accurate metabolism modeling.
+     */
+    val cyp1a2Genotype: Cyp1a2Genotype = Cyp1a2Genotype.NOT_SET,
+
+    /**
+     * Optional AHR rs2066853 genotype for more accurate metabolism modeling.
+     */
+    val ahrGenotype: AhrGenotype = AhrGenotype.NOT_SET,
+
+    /**
+     * Optional hormonal status (pregnancy or oral contraceptives).
+     */
+    val hormonalStatus: HormonalStatus = HormonalStatus.NONE,
+) {
+    /**
+     * Combined clearance factor from optional genetic and hormonal modifiers.
+     * Values < 1.0 mean slower clearance (longer half-life).
+     */
+    val clearanceFactor: Double
+        get() = cyp1a2Genotype.clearanceFactor *
+                ahrGenotype.clearanceFactor *
+                hormonalStatus.clearanceFactor
+
+    /**
+     * Effective half-life after applying genetic and hormonal modifiers.
+     * Use this for all PK calculations instead of [halfLifeMinutes] directly.
+     */
+    val effectiveHalfLifeMinutes: Int
+        get() = (halfLifeMinutes / clearanceFactor).roundToInt()
+}

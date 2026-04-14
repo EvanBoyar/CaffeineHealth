@@ -3,11 +3,25 @@ package com.uc.caffeine.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.datastore.preferences.core.MutablePreferences
+import com.uc.caffeine.data.AhrGenotype
 import com.uc.caffeine.data.AppDateFormat
 import com.uc.caffeine.data.CaffeineDatabase
+import com.uc.caffeine.data.Cyp1a2Genotype
+import com.uc.caffeine.data.HormonalStatus
+import com.uc.caffeine.data.ProfileFactors
+import com.uc.caffeine.data.SettingsKeys
 import com.uc.caffeine.data.SettingsRepository
+import com.uc.caffeine.data.toProfileFactors
 import com.uc.caffeine.data.ThemeMode
 import com.uc.caffeine.data.UserSettings
+import com.uc.caffeine.ui.onboarding.AgeBucket
+import com.uc.caffeine.ui.onboarding.LiverDisease
+import com.uc.caffeine.ui.onboarding.Medication
+import com.uc.caffeine.ui.onboarding.OnboardingAnswers
+import com.uc.caffeine.ui.onboarding.OnboardingProfileCalculator
+import com.uc.caffeine.ui.onboarding.SmokingHabit
+import com.uc.caffeine.ui.onboarding.WeightUnit
 import com.uc.caffeine.data.model.ConsumptionEntry
 import com.uc.caffeine.data.model.DEFAULT_CONSUMPTION_DURATION_MINUTES
 import com.uc.caffeine.data.model.DrinkPreset
@@ -33,6 +47,7 @@ import com.patrykandpatrick.vico.compose.cartesian.data.lineSeries
 import com.patrykandpatrick.vico.compose.pie.data.PieChartModelProducer
 import com.patrykandpatrick.vico.compose.pie.data.pieSeries
 import java.time.LocalDate
+import java.time.LocalTime
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -241,7 +256,7 @@ class CaffeineViewModel(application: Application) : AndroidViewModel(application
         CaffeineCalculator.calculateCurrentLevel(
             entries = allEntries,
             currentTimeMillis = currentTime,
-            halfLifeMinutes = settings.halfLifeMinutes
+            halfLifeMinutes = settings.effectiveHalfLifeMinutes
         )
     }.flowOn(Dispatchers.Default)
     .stateIn(
@@ -264,7 +279,7 @@ class CaffeineViewModel(application: Application) : AndroidViewModel(application
         val caffeineLevel = CaffeineCalculator.calculateCurrentLevel(
             entries = allEntries,
             currentTimeMillis = bedtime,  // Calculate AT bedtime, not now
-            halfLifeMinutes = settings.halfLifeMinutes
+            halfLifeMinutes = settings.effectiveHalfLifeMinutes
         )
         
         Pair(caffeineLevel, bedtime)
@@ -288,7 +303,7 @@ class CaffeineViewModel(application: Application) : AndroidViewModel(application
             .map { entry ->
                 CaffeineCalculator.calculatePeakTime(
                     entry = entry,
-                    halfLifeMinutes = settings.halfLifeMinutes,
+                    halfLifeMinutes = settings.effectiveHalfLifeMinutes,
                 )
             }
             .filter { candidatePeakTime -> candidatePeakTime > now }
@@ -602,10 +617,178 @@ class CaffeineViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun updateCyp1a2Genotype(genotype: Cyp1a2Genotype) {
+        viewModelScope.launch {
+            settingsRepo.updateCyp1a2Genotype(genotype)
+        }
+    }
+
+    fun updateAhrGenotype(genotype: AhrGenotype) {
+        viewModelScope.launch {
+            settingsRepo.updateAhrGenotype(genotype)
+        }
+    }
+
+    fun updateHormonalStatus(status: HormonalStatus) {
+        viewModelScope.launch {
+            settingsRepo.updateProfileFactor {
+                this[SettingsKeys.HORMONAL_STATUS] = status.name
+                // Sync: if setting OC, add to medications; if clearing OC, remove from medications
+                val currentMeds = (this[SettingsKeys.PROFILE_MEDICATIONS] ?: emptySet()).toMutableSet()
+                if (status == HormonalStatus.ORAL_CONTRACEPTIVES) {
+                    currentMeds.remove(Medication.None.name)
+                    currentMeds.add(Medication.OralContraceptives.name)
+                } else {
+                    currentMeds.remove(Medication.OralContraceptives.name)
+                }
+                if (currentMeds.isNotEmpty()) {
+                    this[SettingsKeys.PROFILE_MEDICATIONS] = currentMeds
+                }
+            }
+        }
+    }
+
     fun updateTimeZoneId(timeZoneId: String) {
         viewModelScope.launch {
             settingsRepo.updateTimeZoneId(timeZoneId)
         }
+    }
+
+    // Profile factor update functions — each saves the raw value and recomputes the derived profile.
+    fun updateProfileAgeBucket(ageBucket: AgeBucket?) {
+        updateProfileFactorAndRecompute {
+            if (ageBucket != null) {
+                this[SettingsKeys.PROFILE_AGE_BUCKET] = ageBucket.name
+            }
+        }
+    }
+
+    fun updateProfileWeight(value: Int) {
+        updateProfileFactorAndRecompute {
+            this[SettingsKeys.PROFILE_WEIGHT_VALUE] = value
+        }
+    }
+
+    fun updateProfileWeightUnit(unit: WeightUnit) {
+        val current = userSettings.value.profileFactors
+        val convertedWeight = unit.convertFrom(current.weightValue, runCatching {
+            WeightUnit.valueOf(current.weightUnit)
+        }.getOrDefault(WeightUnit.Kilograms))
+        updateProfileFactorAndRecompute {
+            this[SettingsKeys.PROFILE_WEIGHT_UNIT] = unit.name
+            this[SettingsKeys.PROFILE_WEIGHT_VALUE] = convertedWeight
+        }
+    }
+
+    fun updateProfileInsomnia(hasInsomnia: Boolean) {
+        updateProfileFactorAndRecompute {
+            this[SettingsKeys.PROFILE_HAS_INSOMNIA] = hasInsomnia.toString()
+        }
+    }
+
+    fun updateProfileSmokingHabit(smokingHabit: SmokingHabit) {
+        updateProfileFactorAndRecompute {
+            this[SettingsKeys.PROFILE_SMOKING_HABIT] = smokingHabit.name
+        }
+    }
+
+    fun updateProfileHeavyAlcohol(heavyAlcohol: Boolean) {
+        updateProfileFactorAndRecompute {
+            this[SettingsKeys.PROFILE_HEAVY_ALCOHOL] = heavyAlcohol.toString()
+        }
+    }
+
+    fun updateProfileHeavyCaffeine(heavyCaffeine: Boolean) {
+        updateProfileFactorAndRecompute {
+            this[SettingsKeys.PROFILE_HEAVY_CAFFEINE] = heavyCaffeine.toString()
+        }
+    }
+
+    fun updateProfileLiverDisease(liverDisease: LiverDisease) {
+        updateProfileFactorAndRecompute {
+            this[SettingsKeys.PROFILE_LIVER_DISEASE] = liverDisease.name
+        }
+    }
+
+    fun toggleProfileMedication(medication: Medication) {
+        val current = userSettings.value.profileFactors.medications.mapNotNull {
+            runCatching { Medication.valueOf(it) }.getOrNull()
+        }.toMutableSet()
+
+        when (medication) {
+            Medication.None -> {
+                if (current == setOf(Medication.None)) current.clear()
+                else { current.clear(); current.add(Medication.None) }
+            }
+            else -> {
+                current.remove(Medication.None)
+                if (current.contains(medication)) current.remove(medication)
+                else current.add(medication)
+            }
+        }
+
+        val medicationNames = current.map { it.name }.toSet()
+        updateProfileFactorAndRecompute {
+            this[SettingsKeys.PROFILE_MEDICATIONS] = medicationNames
+            // Sync OC medication ↔ hormonal status
+            if (medicationNames.contains("OralContraceptives")) {
+                this[SettingsKeys.HORMONAL_STATUS] = HormonalStatus.ORAL_CONTRACEPTIVES.name
+            } else if (this[SettingsKeys.HORMONAL_STATUS] == HormonalStatus.ORAL_CONTRACEPTIVES.name) {
+                this[SettingsKeys.HORMONAL_STATUS] = HormonalStatus.NONE.name
+            }
+        }
+    }
+
+    private fun updateProfileFactorAndRecompute(
+        block: MutablePreferences.() -> Unit,
+    ) {
+        viewModelScope.launch {
+            settingsRepo.updateProfileFactor {
+                block()
+                // Recompute profile from all stored factors
+                val factors = toProfileFactors()
+                val answers = buildOnboardingAnswers(factors, userSettings.value)
+                if (answers?.isProfileReady() == true) {
+                    val profile = OnboardingProfileCalculator.calculateProfile(answers)
+                    this[SettingsKeys.HALF_LIFE_MINUTES] = profile.halfLifeMinutes
+                    this[SettingsKeys.SLEEP_THRESHOLD_MG] = profile.sleepThresholdMg
+                }
+            }
+        }
+    }
+
+    private fun buildOnboardingAnswers(
+        factors: ProfileFactors,
+        settings: UserSettings,
+    ): OnboardingAnswers? {
+        val ageBucket = factors.ageBucket?.let {
+            runCatching { AgeBucket.valueOf(it) }.getOrNull()
+        } ?: return null
+        val weightUnit = runCatching { WeightUnit.valueOf(factors.weightUnit) }
+            .getOrDefault(WeightUnit.Kilograms)
+        val smokingHabit = factors.smokingHabit?.let {
+            runCatching { SmokingHabit.valueOf(it) }.getOrNull()
+        } ?: return null
+        val liverDisease = factors.liverDisease?.let {
+            runCatching { LiverDisease.valueOf(it) }.getOrNull()
+        } ?: return null
+        val medications = factors.medications.mapNotNull {
+            runCatching { Medication.valueOf(it) }.getOrNull()
+        }.toSet()
+        if (medications.isEmpty()) return null
+
+        return OnboardingAnswers(
+            ageBucket = ageBucket,
+            weightValue = factors.weightValue,
+            weightUnit = weightUnit,
+            sleepTime = LocalTime.of(settings.sleepTimeHour, settings.sleepTimeMinute),
+            hasInsomnia = factors.hasInsomnia ?: return null,
+            smokingHabit = smokingHabit,
+            heavyAlcohol = factors.heavyAlcohol ?: return null,
+            heavyCaffeine = factors.heavyCaffeine ?: return null,
+            liverDisease = liverDisease,
+            medications = medications,
+        )
     }
 
     suspend fun getUnitsForDrink(drinkId: Int): List<DrinkUnit> {

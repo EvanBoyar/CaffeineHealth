@@ -78,10 +78,8 @@ fun SettingsScreen(
 
                     SettingsDestination.CaffeineProfile -> CaffeineProfileSettingsScreen(
                         userSettings = userSettings,
+                        viewModel = viewModel,
                         onBack = { nestedBackStack.removeLastOrNull() },
-                        onHalfLifeChange = viewModel::updateHalfLife,
-                        onTimeChange = viewModel::updateSleepTime,
-                        onThresholdChange = viewModel::updateSleepThreshold,
                         onRedoOnboarding = onRedoOnboarding,
                     )
 

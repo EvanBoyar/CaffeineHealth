@@ -76,6 +76,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -111,7 +112,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -1305,8 +1308,10 @@ internal fun WeightStepperCard(
     onWeightUnitSelected: (WeightUnit) -> Unit,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
+    onWeightChanged: (Int) -> Unit = {},
 ) {
     val haptics = rememberAppHaptics()
+    var showInputDialog by rememberSaveable { mutableStateOf(false) }
 
     Surface(
         shape = RoundedCornerShape(24.dp),
@@ -1353,13 +1358,24 @@ internal fun WeightStepperCard(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
+                    Surface(
+                        onClick = {
+                            haptics.toggle()
+                            showInputDialog = true
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    ) {
+                        Text(
+                            text = weightValue.toString(),
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
                     Text(
-                        text = weightValue.toString(),
-                        style = MaterialTheme.typography.headlineLarge,
-                        maxLines = 1,
-                    )
-                    Text(
-                        text = "Default starting weight in ${weightUnit.label}",
+                        text = "Tap number to type, or use +/\u2212",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -1382,6 +1398,65 @@ internal fun WeightStepperCard(
             }
         }
     }
+
+    if (showInputDialog) {
+        WeightInputDialog(
+            currentValue = weightValue,
+            weightUnit = weightUnit,
+            onConfirm = { newValue ->
+                onWeightChanged(newValue)
+                showInputDialog = false
+            },
+            onDismiss = { showInputDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun WeightInputDialog(
+    currentValue: Int,
+    weightUnit: WeightUnit,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by rememberSaveable { mutableStateOf(currentValue.toString()) }
+    val parsed = text.toIntOrNull()
+    val isValid = parsed != null && parsed in weightUnit.minSelectable()..weightUnit.maxSelectable()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = { parsed?.let { onConfirm(weightUnit.clamp(it)) } },
+                enabled = isValid,
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        title = { Text("Enter weight") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it.filter { c -> c.isDigit() } },
+                    label = { Text("Weight (${weightUnit.label})") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    isError = text.isNotEmpty() && !isValid,
+                )
+                Text(
+                    text = "Range: ${weightUnit.minSelectable()}–${weightUnit.maxSelectable()} ${weightUnit.label}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+    )
 }
 
 @Composable
